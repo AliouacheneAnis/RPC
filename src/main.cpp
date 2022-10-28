@@ -20,12 +20,14 @@
 #include <Adafruit_AHTX0.h>
 #include<WIFIConnector_MKR1000.h>
 #include<MQTTConnector.h>
+#include<Servo.h>
 
 
 RTC_DS3231 rtc;      // Declration object rtc
 Adafruit_AHTX0 aht;  // Declaratiob object aht
+Servo myservo;
 
-const int CHIP_SELECT = 4;  // chipselect pour fonctionner le mem shield 
+const int CHIP_SELECT = 4, SERVO = 1;  // chipselect pour fonctionner le mem shield 
 const unsigned long DELAY_TIME = 5000, DELAY_TIME_ENVOI = 30000, DELAY_RPC = 2000;  // Temps d'attente 
 const int LED_PIN_ROUGE = 2, LED_PIN_BLUE = 3, IntensiteAllumer = 255, IntensiteEteint = 0;  
 
@@ -34,10 +36,12 @@ String Seconde, Minute, Heure, Jour, Mois, Annee, DataString, DataEnvoi,Data;
 
 long AnalogValue; 
 unsigned long  TempsAvant = 0, TempsAvantEnvoi = 0,TempsRPC = 0; 
-int CurrentVal; 
+int CurrentVal, Position = 90;  
 
 void setup() {
-
+  
+  myservo.attach(SERVO);
+  
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
 
@@ -66,8 +70,7 @@ void setup() {
     Serial.println("Found AHT20");
     } else {
     Serial.println("Didn't find AHT20");
-  }  
-  
+  }   
 }
 
 void loop() {
@@ -80,16 +83,7 @@ void loop() {
       aht.getEvent(&Hum, &Tmp);// populate temp and humidity objects with fresh data
 
       DateTime now = rtc.now(); // Declaration object Now qui recois les donnees actuelle de la part de l'object rtc 
-      // recupuration du temps actuel et Changement type de donnees en string
-      /*
-      Heure = String(now.hour(), DEC); 
-      Minute = String(now.minute(),DEC); 
-      Seconde = String(now.second(), DEC); 
-      Annee  = String(now.year(), DEC); 
-      Mois = String(now.month(), DEC);
-      Jour = String(now.day(),DEC); 
-      */
-
+      
       // Creation de la chaine de caractere 
       DataString = "{\"ts\": " + String(now.unixtime()+ 14400 ) + "000, \"values\":{\"tmp\": " + String(Tmp.temperature) + ", \"Hum\": " + String(Hum.relative_humidity) + "}}F";
 
@@ -149,18 +143,24 @@ void loop() {
           {
             if (DataRecu == "Clim")
             {
-              analogWrite(LED_PIN_ROUGE, IntensiteAllumer);
-              Serial.println("LED Rouge Allumer"); 
+                analogWrite(LED_PIN_ROUGE, IntensiteAllumer);
+                Serial.println("LED Rouge Allumer"); 
+                Position = 180;   
+                myservo.write(Position); // Servo moteur vers la position 180
 
             }else if (DataRecu == "Chauffage")
             {
-              analogWrite(LED_PIN_BLUE, IntensiteAllumer);
-              Serial.println("LED Blue Allmer"); 
+                analogWrite(LED_PIN_BLUE, IntensiteAllumer);
+                Serial.println("LED Blue Allmer"); 
+                Position = 0;   
+                myservo.write(Position); // Servo moteur vers la position 0
 
             }else{ 
                   analogWrite(LED_PIN_ROUGE, IntensiteEteint);
                   analogWrite(LED_PIN_BLUE, IntensiteEteint);
                   Serial.println("pasDatarecu");
+                  Position = 90;   
+                  myservo.write(Position); // Servo moteur vers la position 0
             }
             
             Data = DataRecu;
