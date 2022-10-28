@@ -26,22 +26,24 @@ RTC_DS3231 rtc;      // Declration object rtc
 Adafruit_AHTX0 aht;  // Declaratiob object aht
 
 const int CHIP_SELECT = 4;  // chipselect pour fonctionner le mem shield 
-const unsigned long DELAY_TIME = 5000, DELAY_TIME_ENVOI = 60000;  // Temps d'attente 
+const unsigned long DELAY_TIME = 5000, DELAY_TIME_ENVOI = 30000, DELAY_RPC = 2000;  // Temps d'attente 
+const int LED_PIN_ROUGE = 2, LED_PIN_BLUE = 3, IntensiteAllumer = 255, IntensiteEteint = 0;  
 
 sensors_event_t Tmp, Hum;   // Declaration evenement 
-String Seconde, Minute, Heure, Jour, Mois, Annee, DataString, DataEnvoi;  
-unsigned long  TempsAvant = 0, TempsAvantEnvoi = 0; 
+String Seconde, Minute, Heure, Jour, Mois, Annee, DataString, DataEnvoi,Data;
+
+long AnalogValue; 
+unsigned long  TempsAvant = 0, TempsAvantEnvoi = 0,TempsRPC = 0; 
+int CurrentVal; 
 
 void setup() {
 
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
-    while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
-  
-    wifiConnect(); 
-    MQTTConnect(); 
+
+  pinMode(LED_PIN_BLUE,OUTPUT);
+  pinMode(LED_PIN_ROUGE,OUTPUT); 
+  pinMode(LED_BUILTIN,OUTPUT); 
 
   Serial.print("Initializing SD card...");
   // see if the card is present and can be initialized:
@@ -69,6 +71,8 @@ void setup() {
 }
 
 void loop() {
+  
+  digitalWrite(LED_BUILTIN, LOW);
 
   if (millis() - TempsAvant > DELAY_TIME )
   
@@ -77,17 +81,17 @@ void loop() {
 
       DateTime now = rtc.now(); // Declaration object Now qui recois les donnees actuelle de la part de l'object rtc 
       // recupuration du temps actuel et Changement type de donnees en string
-
+      /*
       Heure = String(now.hour(), DEC); 
       Minute = String(now.minute(),DEC); 
       Seconde = String(now.second(), DEC); 
       Annee  = String(now.year(), DEC); 
       Mois = String(now.month(), DEC);
       Jour = String(now.day(),DEC); 
+      */
 
       // Creation de la chaine de caractere 
-      DataString = "{\"DateTime\": "  + Heure + "h" + Minute + "m" + Seconde + "s" + Annee + '-' + Mois + '-' + Jour + ",\"Tmp\": " + Tmp.temperature + ",\"Hum\": " + Hum.relative_humidity + "}F";
-      
+      DataString = "{\"ts\": " + String(now.unixtime()+ 14400 ) + "000, \"values\":{\"tmp\": " + String(Tmp.temperature) + ", \"Hum\": " + String(Hum.relative_humidity) + "}}F";
 
       // open the file. note that only one file can be open at a time,
       // so you have to close this one before opening another.
@@ -110,6 +114,11 @@ void loop() {
 
   if ( millis() - TempsAvantEnvoi > DELAY_TIME_ENVOI )
   { 
+    status = WL_IDLE_STATUS; 
+    digitalWrite(LED_BUILTIN, HIGH);
+    wifiConnect(); 
+    MQTTConnect();
+
     unsigned int i = 0; 
     File dataFile = SD.open("datalog.txt", FILE_READ);
         // if the file is available, write to it:
@@ -122,19 +131,48 @@ void loop() {
             Payload = dataFile.readStringUntil('F'); // lire le fichier jusqu'a qu'on trouve le caractere F qui indique la fin de la chaine MQTT et affecter la chaine a Payload 
             i = dataFile.position() + 1; // sauter la ligne pour lire la prochaine chaine MQTT 
             sendPayload(); // Envoi de la chaine MQTT 
+            delay(500); 
         }
 
       }
     // if the file isn't open, pop up an error:
        else {
         Serial.println("error opening datalog.txt");
+      } 
+      
+      dataFile.close(); 
+      SD.remove("datalog.txt");
+      ClientMQTT.loop();
+      Serial.println(DataRecu);
+      Serial.println("Datarecu");
+          if (DataRecu != Data)
+          {
+            if (DataRecu == "Clim")
+            {
+              analogWrite(LED_PIN_ROUGE, IntensiteAllumer);
+              Serial.println("LED Rouge Allumer"); 
+
+            }else if (DataRecu == "Chauffage")
+            {
+              analogWrite(LED_PIN_BLUE, IntensiteAllumer);
+              Serial.println("LED Blue Allmer"); 
+
+            }else{ 
+                  analogWrite(LED_PIN_ROUGE, IntensiteEteint);
+                  analogWrite(LED_PIN_BLUE, IntensiteEteint);
+                  Serial.println("pasDatarecu");
+            }
+            
+            Data = DataRecu;
+        }
+      
+      Serial.println("\n prochain Lot .... "); 
+      ClientMQTT.disconnect();
+      WiFi.disconnect();
+      WiFi.end();
+      digitalWrite(LED_BUILTIN, LOW);
+      TempsAvantEnvoi = millis();
       }
 
-      dataFile.close(); 
-      SD.remove("datalog.txt"); 
-      Serial.println("\n prochain Lot .... "); 
-
-    TempsAvantEnvoi = millis();
-  }
 
 }

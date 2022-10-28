@@ -27,6 +27,16 @@ MQTTClient ClientMQTT;      // Création d'un client MQTT pour l'échange de don
 
 
 String Payload ="{";      // Chaine de caractère qui contiendra le message envoyer de l'objet vers thingsboard
+String DataRecu;
+
+void messageReceived(String &topic, String &payload) {
+
+  Serial.println("Message Recu");
+  Serial.println(payload);
+  DataRecu = payload.substring(payload.lastIndexOf(":") + 2, payload.indexOf("}") - 1);
+  Serial.println(topic);
+  
+}
 
 
 // Fonctionnalité de branchement utilisant le protocole MQTT
@@ -34,6 +44,8 @@ String Payload ="{";      // Chaine de caractère qui contiendra le message envo
 void MQTTConnect() {
   
   ClientMQTT.begin(MQTT_SERVER, MQTT_SERVER_PORT, ClientWIFI);
+  delay(1000); 
+  ClientMQTT.onMessage(messageReceived);
   
   while (!ClientMQTT.connect(DEVICE_ID, TOKEN, "")) {
     Serial.print(".");
@@ -41,6 +53,8 @@ void MQTTConnect() {
   }
 
   Serial.println("\nBranché au broker MQTT!\n");
+
+  ClientMQTT.subscribe("v1/devices/me/rpc/request/+");
 
 }
 
