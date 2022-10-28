@@ -83,6 +83,7 @@ void loop() {
       DateTime now = rtc.now(); // Declaration object Now qui recois les donnees actuelle de la part de l'object rtc 
       
       // Creation de la chaine de caractere 
+      // j'ai ajouter le nombre 18480 pour ajuster le temps au temps reel ici et trois 0 pour transfere du seconde au milisecondes 
       DataString = "{\"ts\": " + String(now.unixtime()+ 18480 ) + "000, \"values\":{\"tmp\": " + String(Tmp.temperature) + ", \"Hum\": " + String(Hum.relative_humidity) + "}}F";
 
       // open the file. note that only one file can be open at a time,
